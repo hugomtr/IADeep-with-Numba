@@ -1,7 +1,7 @@
 import GameNumba as GN
 from GameNumba import *
 
-SIZE_DATASET = 100
+SIZE_DATASET = 100000
 
 label = np.zeros((SIZE_DATASET,64),dtype = np.int8)
 train_set = np.zeros((SIZE_DATASET,3,64),dtype = np.int8)
@@ -33,13 +33,19 @@ def add_to_database(B,idx_start,nbSimus,c):
 
 
 idx_start = 0
+c = 0
 while(True):
     B = StartingBoard.copy()
-    idx_start += add_to_database(B,idx_start,nbSimus=1000,c=0.5)
-    print(idx_start)
+    idx_start += add_to_database(B,idx_start,nbSimus=100,c=0.3)
+    
     if idx_start >= SIZE_DATASET:
         break
 
-print(train_set[25,...])
-print("/n")
-print(label[25,...])
+    if c % 100 == 0:
+        print(idx_start, " entry") 
+    c += 1
+
+
+np.save('data/X.npy', train_set)
+np.save('data/Y.npy', label)
+

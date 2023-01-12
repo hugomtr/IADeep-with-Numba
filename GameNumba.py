@@ -153,24 +153,25 @@ def ParrallelPlayoutSimuMCTS(nbSimus,Board,c):
     c : coef exploration / exploitation
     """
     nbPossiblemove = Board[-1]
-    
+    nbSimus *= nbPossiblemove                                             # We launch the same number of simus of traditional methods  
+
     UCB_scores = np.zeros(nbPossiblemove,dtype=np.float32) 
-    scores = np.zeros((nbPossiblemove,nbSimus), dtype=np.int8)
+    scores = np.zeros(nbPossiblemove, dtype=np.int32)
     n_try = np.ones(nbPossiblemove,dtype=np.uint16)
     means = np.zeros(nbPossiblemove,dtype=np.float32)
 
-    for simu in range(1,nbSimus):   
+    for simu in range(1,nbSimus+1):   
         Bmove = Board.copy()
         best_move_idx = np.argmax(UCB_scores)                             # Selection of best move given the highest value of UCB_scores
-        idxBestMoveUCB = Board[best_move_idx] 
+        idxBestMoveUCB = Bmove[best_move_idx] 
         Play(Bmove,idxBestMoveUCB)                                        # Play the best move
         Playout(Bmove)                                                    # Simulate a game following the best move
-        scores[best_move_idx,n_try[best_move_idx]] = GetScore(Bmove)
-        n_try[best_move_idx] += 1                                     
-        means[best_move_idx] = scores[best_move_idx,:].mean()             
+        scores[best_move_idx] += GetScore(Bmove)                          # Add the score of the simulation
+        n_try[best_move_idx] += 1                                         # Add one for one simulation play with the current move idx
+        means[best_move_idx] = scores[best_move_idx]/(n_try[best_move_idx] - 1)          # Retrieve the mean
 
         for i in range(nbPossiblemove):
-            UCB_scores[i] += means[i] + c * np.sqrt(np.log(simu)/n_try[i])
+            UCB_scores[i] = means[i] + c * np.sqrt(np.log(simu)/n_try[i])
         
     id = np.argmax(UCB_scores)
     return id
@@ -187,7 +188,7 @@ def PlayoutIANP(B,N):
                 Bmove = B.copy()
                 idMovetest = B[move]
                 Play(Bmove,idMovetest)
-                scores[move] = ParrallelPlayoutSimu(nbSimus=N,Board = Bmove) # Run 100 simulation of a game with a specific move and average those scores 
+                scores[move] = ParrallelPlayoutSimu(nbSimus=N,Board = Bmove) # Run N simulation of a game with a specific move and average those scores 
             id = np.argmax(scores)
         else:
             id = random.randint(0,B[-1]-1) 
@@ -270,10 +271,10 @@ def ParralelPlayoutIANPvsNpP(nbGames,N,Np):
 
     print("gainIA",N,"P :", 100*gain_IAN/nbGames ,"%","gainIA",Np,"P : ", 100*gain_IANp/nbGames,"%")
 
-@numba.jit(nopython=True, parallel=True)
+@numba.jit(nopython=True, parallel=False)
 def ParralelPlayoutIAMCTS(nbGames,nbSimus,c):
     gain_IAMCTS,gain_Player = 0,0
-    for _ in numba.prange(nbGames):
+    for i in numba.prange(nbGames):
         B = StartingBoard.copy()
         PlayoutMCTS(B,nbSimus,c)
         if GetScore(B) > 0: gain_IAMCTS += 1 
@@ -327,4 +328,7 @@ def PlayoutDebug(B,verbose=False,display = True):
 # PlayoutDebug(B,True)
 # print("Score : ",GetScore(B))
 # print("")
+
+# for c in [0.2,0.4,0.6,0.8,1.0,1.2,1.6,2.0]:
+#     ParralelPlayoutIAMCTS(1000,2000,c)
 
