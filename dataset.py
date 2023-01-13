@@ -15,10 +15,10 @@ def add_to_database(B,idx_start,nbSimus,c):
 
         if B[-3] == 0:
             id = GN.ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c)  
-            train_set[idx,2,:] = np.ones(64)       # append 0 list for player 0
+            train_set[idx,2,:] = np.zeros(64)       # append 0 list for player 0
         else:
             id = GN.ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c)  
-            train_set[idx,2,:] = np.zeros(64)      # append 1 list for player 1  
+            train_set[idx,2,:] = np.ones(64)      # append 1 list for player 1  
         
         idMove = B[id]           
         _,x,y = GN.DecodeIDmove(idMove)   
@@ -26,8 +26,8 @@ def add_to_database(B,idx_start,nbSimus,c):
         label[idx,idx_move] = 1
 
         GN.Play(B,idMove)
-        train_set[idx,1,:] = B[64:128]                        # append the game world
-        train_set[idx,0,:] = -(train_set[idx,1,:] - 1)  # "" ""  the game world negative
+        train_set[idx,0,:] = B[64:128]                        # append the game world
+        train_set[idx,1,:] = -(B[64:128]  - 1)  # "" ""  the game world negative
         turn += 1
     return turn
 

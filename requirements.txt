@@ -1,2 +1,8 @@
-numpy==1.22.3  
+numpy==1.21.0  
 numba
+tensorflow
+keras
+scikit-learn==1.1.2
+matplotlib==3.2.2
+argparse==1.1
+os

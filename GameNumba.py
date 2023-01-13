@@ -3,7 +3,8 @@ import random
 import time
 import numba
 from numba import jit  # jit convertit une fonction python => fonction C
-
+import train as T
+from train import *
 
 ###################################################################
 
@@ -99,6 +100,34 @@ def GetScore(B):
     if B[-2] == 20 : return -1
     return 0
 
+def PlayDeep(B,id):
+    # WARNING !!!!
+    # IA Deep will always be by convention player 1
+    # if id == 63:
+    #     print("frfr")
+    #     return False
+
+    if id > 63:
+        # IA Deep ne peut jouer ce coup la même qd le plateau est vide
+        return False
+
+    id += 64
+
+    if (B[id] == 0 & B[id] == 0):
+        B[id] = 1
+        B[id+1] = 1
+
+        _PossibleMoves(0,B)
+        B[-3] = 0
+
+        if B[-1] == 0  :             # gameover
+            B[-2] = 20
+        
+        return True
+    else:
+        return False
+
+
 
 @jit(nopython=True)
 def Play(B,idMove):
@@ -118,22 +147,24 @@ def Play(B,idMove):
         B[-2] = (player+1)*10    # player 0 win => 10  / player 1 win => 20
 
 
+_PossibleMoves(0,StartingBoard) 
+
 
 ################################################################
-
-IA = 0
-IAN0 = 0
-IAN1 = 1
+##           Fonction simulation d'une partie                 ##
 
 @jit(nopython=True)
 def Playout(B):
     while B[-1] != 0: 
-        if B[-3] == IA:
+        if B[-3] == 0:
             id = random.randint(0,B[-1]-1)  # IA select random move        
         else:
             id = random.randint(0,B[-1]-1) 
         idMove = B[id]
         Play(B,idMove)
+
+################################################################
+##           Fonction simulation de plusieurs parties         ##
 
 
 @numba.jit(nopython=True)
@@ -177,13 +208,14 @@ def ParrallelPlayoutSimuMCTS(nbSimus,Board,c):
     return id
 
 ################################################################
+## Fonction simulation d'une partie entres différentes IA(s) ##
 
 @jit(nopython=True)
-def PlayoutIANP(B,N):
+def PlayoutIANPvsRand(B,N):
     while B[-1] != 0: 
-        if B[-3] == IA:   
-            nbPossiblemove = B[-1]
-            scores = np.zeros(nbPossiblemove,dtype=np.int32)            
+        nbPossiblemove = B[-1]
+        scores = np.zeros(nbPossiblemove,dtype=np.int32)          
+        if B[-3] == 0:     
             for move in range(nbPossiblemove - 1):   
                 Bmove = B.copy()
                 idMovetest = B[move]
@@ -202,30 +234,30 @@ def PlayoutIANPvsNpP(B,N,Np):
     while B[-1] != 0: 
         nbPossiblemove = B[-1]
         scores = np.zeros(nbPossiblemove,dtype=np.int32)            
-        
-        if B[-3] == IAN0:   
+        if B[-3] == 0:   
             for move in range(nbPossiblemove - 1):   
                 Bmove = B.copy()
                 idMovetest = B[move]
                 Play(Bmove,idMovetest)
                 scores[move] = ParrallelPlayoutSimu(nbSimus = N,Board = Bmove) 
-                id = np.argmax(scores)
-        if B[-3] == IAN1:   
+            id = np.argmax(scores)
+        if B[-3] == 1:   
             for move in range(nbPossiblemove - 1):   
                 Bmove = B.copy()
                 idMovetest = B[move]
                 Play(Bmove,idMovetest)
                 scores[move] = ParrallelPlayoutSimu(nbSimus = Np,Board = Bmove) 
-                id = np.argmin(scores)
+            id = np.argmin(scores)
+
 
         idMove = B[id]
         Play(B,idMove)
 
 
 @jit(nopython=True)
-def PlayoutMCTS(B,nbSimus,c):
+def PlayoutMCTSvsRand(B,nbSimus,c):
     while B[-1] != 0: 
-        if B[-3] == IA:
+        if B[-3] == 0:
             id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c)  
         else:
             id = random.randint(0,B[-1]-1) 
@@ -233,32 +265,70 @@ def PlayoutMCTS(B,nbSimus,c):
         Play(B,idMove)
 
 
-_PossibleMoves(0,StartingBoard) 
+@jit(nopython=True)
+def PlayoutMCTSvsIANp(B,nbSimus,c):
+    while B[-1] != 0: 
+        nbPossiblemove = B[-1]
+        scores = np.zeros(nbPossiblemove,dtype=np.int32)            
+        if B[-3] == 0:
+            id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c)  
+        if B[-3] == 1:   
+            for move in range(nbPossiblemove - 1):   
+                Bmove = B.copy()
+                idMovetest = B[move]
+                Play(Bmove,idMovetest)
+                scores[move] = ParrallelPlayoutSimu(nbSimus = nbSimus,Board = Bmove) 
+            id = np.argmin(scores)    
+        
+        idMove = B[id]
+        Play(B,idMove)
 
-#########################################
+try:    
+    model.load_weights("weights/weight")
+except:
+    print("model not trained yet")
+
+def PlayoutMCTSvsIADeep(B,nbSimus,c):
+    i = 0
+    while B[-1] != 0: 
+        if B[-3] == 0:
+            id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c) 
+            idMove = B[id]
+            Play(B,idMove)
+        if B[-3] == 1:   
+            entry = np.zeros((1,3,64),dtype = np.int8)
+            entry[0,0,:] = B[64:128]                        # append the game world
+            entry[0,1,:] = -(B[64:128] - 1) 
+            entry[0,2,:] = np.ones(64) 
+            pred = model(entry).numpy()
+            pred = pred[0]
+            pred = np.argsort(pred)[::-1]
+            count = 0
+            while not PlayDeep(B,id):
+                count+=1
+                if count > 63:
+                    B[-2] = 10 # joueur 0 gagne
+                    Terminated(B)
+                    break
+                id = np.argsort(pred)[::-1][count]
+
+
+########################################################################
 #
-#   Fonctions de Simulation des Parties
+#   Fonctions de simulation de plusieures parties entres IA(s)
+
 
 @numba.jit(nopython=True, parallel=True)
-def ParralelPlayout(nbGames):
+def ParralelPlayoutIANPvsRand(nbGames,N):
     gain_IA,gain_Player = 0,0
     for _ in numba.prange(nbGames):
         B = StartingBoard.copy()
-        Playout(B)
-        if GetScore(B) > 0: gain_IA += 1 
-        else : gain_Player += 1
-
-    print("gainIA : ", 100*gain_IA/nbGames ,"%","gainPlayer : ", 100*gain_Player/nbGames,"%")
-
-@numba.jit(nopython=True, parallel=True)
-def ParralelPlayoutIANP(nbGames,N):
-    gain_IA,gain_Player = 0,0
-    for _ in numba.prange(nbGames):
-        B = StartingBoard.copy()
-        PlayoutIANP(B,N)
+        PlayoutIANPvsRand(B,N)
         if GetScore(B) > 0: gain_IA += 1 
         else : gain_Player += 1
     print("gainIA : ", 100*gain_IA/nbGames ,"%","gainPlayer : ", 100*gain_Player/nbGames,"%")
+
+
 
 @numba.jit(nopython=True, parallel=True)
 def ParralelPlayoutIANPvsNpP(nbGames,N,Np):
@@ -271,16 +341,42 @@ def ParralelPlayoutIANPvsNpP(nbGames,N,Np):
 
     print("gainIA",N,"P :", 100*gain_IAN/nbGames ,"%","gainIA",Np,"P : ", 100*gain_IANp/nbGames,"%")
 
-@numba.jit(nopython=True, parallel=False)
-def ParralelPlayoutIAMCTS(nbGames,nbSimus,c):
+
+
+@numba.jit(nopython=True, parallel=True)
+def ParralelPlayoutMCTSvsRand(nbGames,nbSimus,c):
     gain_IAMCTS,gain_Player = 0,0
     for i in numba.prange(nbGames):
         B = StartingBoard.copy()
-        PlayoutMCTS(B,nbSimus,c)
+        PlayoutMCTSvsRand(B,nbSimus,c)
         if GetScore(B) > 0: gain_IAMCTS += 1 
         else : gain_Player += 1
 
     print("gain_IA_MCTS : ", 100*gain_IAMCTS/nbGames ,"%","gainPlayer : ", 100*gain_Player/nbGames,"%")
+
+
+
+@numba.jit(nopython=True, parallel=True)
+def ParralelPlayoutMCTSvsIANp(nbGames,nbSimus,c):
+    gain_IAMCTS,gain_Player = 0,0
+    for i in numba.prange(nbGames):
+        B = StartingBoard.copy()
+        PlayoutMCTSvsIANp(B,nbSimus,c)
+        if GetScore(B) > 0: gain_IAMCTS += 1 
+        else : gain_Player += 1
+
+    print("gain_IA_MCTS : ", 100*gain_IAMCTS/nbGames ,"%","gain_IA",nbSimus,"P : ", 100*gain_Player/nbGames,"%")
+
+
+def ParralelPlayoutMCTSvsIADeep(nbGames,nbSimus,c):
+    gain_IAMCTS,gain_IADeep = 0,0
+    for i in range(nbGames):
+        B = StartingBoard.copy()
+        PlayoutMCTSvsIADeep(B,nbSimus,c)
+        if GetScore(B) > 0: gain_IAMCTS += 1 
+        else : gain_IADeep += 1
+
+    print("gain_IA_MCTS : ", 100*gain_IAMCTS/nbGames ,"%","gainIA_Deep : ", 100*gain_IADeep/nbGames,"%")
 
 
 ##################################################################
@@ -331,4 +427,3 @@ def PlayoutDebug(B,verbose=False,display = True):
 
 # for c in [0.2,0.4,0.6,0.8,1.0,1.2,1.6,2.0]:
 #     ParralelPlayoutIAMCTS(1000,2000,c)
-
