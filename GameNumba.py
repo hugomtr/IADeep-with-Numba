@@ -75,6 +75,14 @@ def _PossibleMoves(idPlayer,B):   # analyse B => liste des coups possibles par o
 
     B[-1] = nb
 
+def DecodeIDmoveDeep(IDmove):
+    y = IDmove % 10
+    x = int(IDmove/10) % 10
+    return 8 * y + x
+
+def _PossibleMovesDeep(idx_end,possible_moves):   # analyse B => liste des coups possibles par ordre croissant
+    vfunc = np.vectorize(DecodeIDmoveDeep)
+    return np.array(vfunc(possible_moves[0:idx_end])) # select only move possible for player 1
 
 ###################################################################
 
@@ -100,35 +108,6 @@ def GetScore(B):
     if B[-2] == 20 : return -1
     return 0
 
-def PlayDeep(B,id):
-    # WARNING !!!!
-    # IA Deep will always be by convention player 1
-    # if id == 63:
-    #     print("frfr")
-    #     return False
-
-    if id > 63:
-        # IA Deep ne peut jouer ce coup la même qd le plateau est vide
-        return False
-
-    id += 64
-
-    if (B[id] == 0 & B[id] == 0):
-        B[id] = 1
-        B[id+1] = 1
-
-        _PossibleMoves(0,B)
-        B[-3] = 0
-
-        if B[-1] == 0  :             # gameover
-            B[-2] = 20
-        
-        return True
-    else:
-        return False
-
-
-
 @jit(nopython=True)
 def Play(B,idMove):
     player,x,y = DecodeIDmove(idMove)
@@ -146,7 +125,6 @@ def Play(B,idMove):
     if B[-1] == 0  :             # gameover
         B[-2] = (player+1)*10    # player 0 win => 10  / player 1 win => 20
 
-
 _PossibleMoves(0,StartingBoard) 
 
 
@@ -163,6 +141,42 @@ def Playout(B):
         idMove = B[id]
         Play(B,idMove)
 
+
+##################################################################
+#
+#   for demo only - do not use for computation
+
+def Print(B):
+    for yy in range(8):
+        y = 7 - yy
+        s = str(y)
+        for x in range(8):
+            if     B[iPxy(x,y)] == 1 : s += '::'
+            else:                      s += '[]'
+        print(s)
+    s = ' '
+    for x in range(8): s += str(x)+str(x)
+    print(s)
+    # nbMoves = B[-1]
+    # print("Possible moves :", nbMoves);
+    # s = ''
+    # for i in range(nbMoves):
+    #     s += str(B[i]) + ' '
+    # print(s)
+
+def PlayoutDebug(B,verbose=False,display = True):
+    if display: Print(B)
+    while not Terminated(B):
+        id = random.randint(0,B[-1]-1)
+        idMove = B[id]
+        player,x,y = DecodeIDmove(idMove)
+        Play(B,idMove)
+        if display:
+            print("Playing : ",idMove, " -  Player: ",player, "  X:",x," Y:",y)
+            Print(B)
+            print("---------------------------------------")
+
+
 ################################################################
 ##           Fonction simulation de plusieurs parties         ##
 
@@ -178,7 +192,7 @@ def ParrallelPlayoutSimu(nbSimus,Board):
 
 
 @numba.jit(nopython=True)
-def ParrallelPlayoutSimuMCTS(nbSimus,Board,c):
+def ParrallelPlayoutSimuMCTS(nbSimus,Board,c,player=0):
     """
     nbSimus : nombre total de simulation = somme des simulations effectuées sur tous les coups possibles
     c : coef exploration / exploitation
@@ -203,8 +217,11 @@ def ParrallelPlayoutSimuMCTS(nbSimus,Board,c):
 
         for i in range(nbPossiblemove):
             UCB_scores[i] = means[i] + c * np.sqrt(np.log(simu)/n_try[i])
-        
-    id = np.argmax(UCB_scores)
+
+    if player == 0:    
+        id = np.argmax(UCB_scores)
+    else:
+        id = np.argmin(UCB_scores)
     return id
 
 ################################################################
@@ -249,7 +266,6 @@ def PlayoutIANPvsNpP(B,N,Np):
                 scores[move] = ParrallelPlayoutSimu(nbSimus = Np,Board = Bmove) 
             id = np.argmin(scores)
 
-
         idMove = B[id]
         Play(B,idMove)
 
@@ -260,9 +276,10 @@ def PlayoutMCTSvsRand(B,nbSimus,c):
         if B[-3] == 0:
             id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c)  
         else:
-            id = random.randint(0,B[-1]-1) 
-        idMove = B[id]
-        Play(B,idMove)
+            id = random.randint(0,B[-1]-1)
+        
+        idMove = B[id] 
+        Play(B,idMove) 
 
 
 @jit(nopython=True)
@@ -283,34 +300,35 @@ def PlayoutMCTSvsIANp(B,nbSimus,c):
         idMove = B[id]
         Play(B,idMove)
 
+
 try:    
-    model.load_weights("weights/weight")
+    model.load_weights("weights/weights")
 except:
+    print("\nWARNING !")
     print("model not trained yet")
 
+
 def PlayoutMCTSvsIADeep(B,nbSimus,c):
-    i = 0
     while B[-1] != 0: 
         if B[-3] == 0:
-            id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c) 
-            idMove = B[id]
-            Play(B,idMove)
-        if B[-3] == 1:   
             entry = np.zeros((1,3,64),dtype = np.int8)
             entry[0,0,:] = B[64:128]                        # append the game world
             entry[0,1,:] = -(B[64:128] - 1) 
-            entry[0,2,:] = np.ones(64) 
+            entry[0,2,:] = np.zeros(64) 
             pred = model(entry).numpy()
+            possible_moves_ids = _PossibleMovesDeep(B[-1],B[0:64])
             pred = pred[0]
-            pred = np.argsort(pred)[::-1]
-            count = 0
-            while not PlayDeep(B,id):
-                count+=1
-                if count > 63:
-                    B[-2] = 10 # joueur 0 gagne
-                    Terminated(B)
-                    break
-                id = np.argsort(pred)[::-1][count]
+            pred = pred[possible_moves_ids] # select only possible moves idx for player 1 
+            id = np.argsort(pred)[-1]
+            assert(len(pred) == B[-1])
+            idMove = B[id]
+            Play(B,idMove)
+        else:
+            id = ParrallelPlayoutSimuMCTS(nbSimus = nbSimus,Board = B,c = c,player=1) 
+            idMove = B[id]
+            Play(B,idMove)
+    
+
 
 
 ########################################################################
@@ -373,47 +391,12 @@ def ParralelPlayoutMCTSvsIADeep(nbGames,nbSimus,c):
     for i in range(nbGames):
         B = StartingBoard.copy()
         PlayoutMCTSvsIADeep(B,nbSimus,c)
-        if GetScore(B) > 0: gain_IAMCTS += 1 
-        else : gain_IADeep += 1
+        if GetScore(B) > 0: gain_IADeep += 1 
+        else : gain_IAMCTS += 1
 
     print("gain_IA_MCTS : ", 100*gain_IAMCTS/nbGames ,"%","gainIA_Deep : ", 100*gain_IADeep/nbGames,"%")
 
 
-##################################################################
-#
-#   for demo only - do not use for computation
-
-def Print(B):
-    for yy in range(8):
-        y = 7 - yy
-        s = str(y)
-        for x in range(8):
-            if     B[iPxy(x,y)] == 1 : s += '::'
-            else:                      s += '[]'
-        print(s)
-    s = ' '
-    for x in range(8): s += str(x)+str(x)
-    print(s)
-
-
-    nbMoves = B[-1]
-    print("Possible moves :", nbMoves);
-    s = ''
-    for i in range(nbMoves):
-        s += str(B[i]) + ' '
-    print(s)
-
-def PlayoutDebug(B,verbose=False,display = True):
-    if display: Print(B)
-    while not Terminated(B):
-        id = random.randint(0,B[-1]-1)
-        idMove = B[id]
-        player,x,y = DecodeIDmove(idMove)
-        Play(B,idMove)
-        if display:
-            print("Playing : ",idMove, " -  Player: ",player, "  X:",x," Y:",y)
-            Print(B)
-            print("---------------------------------------")
 
 
 # ################################################################

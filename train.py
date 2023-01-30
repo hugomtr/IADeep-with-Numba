@@ -9,8 +9,11 @@ from sklearn.metrics import accuracy_score
 import os 
 import argparse
 
-Y = np.load('data/Y.npy')
-X = np.load('data/X.npy')
+try:
+  Y = np.load('data/Y.npy')
+  X = np.load('data/X.npy')
+except:
+  print("\nError No data!")
 
 N_RESNET_BLOCKS = 3
 N_LEVELS = 1
@@ -23,7 +26,7 @@ parser.add_argument("--res_blocks", type=int, default=N_RESNET_BLOCKS, help="Num
 parser.add_argument("--levels", type=int, default=N_LEVELS, help="different levels for the network must be > 0, level = i means the network will use conv layers wth increasing num of filters = 2**k for k in range(1,i)")
 parser.add_argument("--epochs", type=int, default=N_EPOCHS, help="Number of epochs")
 parser.add_argument("--batch_size", type=int, default=BATCH_SIZE, help="Batch size")
-parser.add_argument("--dropout", type=bool, default=False, help="Adding dropout")
+parser.add_argument("--dropout", type=float, default=0.0, help="dropout value")
 args = parser.parse_args()
 
 def resnet_block(input_data,filters,conv_size):
@@ -53,8 +56,8 @@ def CustomResNet():
 
   x = GlobalAveragePooling1D()(x)
   x = Dense(64, activation='softmax')(x)
-  if args.dropout:
-    x = Dropout(0.2)(x)
+  if args.dropout != 0.0:
+    x = Dropout(args.dropout)(x)
   return Model(inputs,x)
 
 
@@ -99,7 +102,7 @@ def train_model():
             print(error)
             exit()
 
-    model.save_weights("weights/weights052")
+    model.save_weights("weights/weights")
 
 if (args.train):    
     train_model()
