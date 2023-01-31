@@ -394,7 +394,7 @@ def ParralelPlayoutMCTSvsIADeep(nbGames,nbSimus,c):
         if GetScore(B) > 0: gain_IADeep += 1 
         else : gain_IAMCTS += 1
 
-    print("gain_IA_MCTS : ", 100*gain_IAMCTS/nbGames ,"%","gainIA_Deep : ", 100*gain_IADeep/nbGames,"%")
+    print("gain_IADeep : ", 100*gain_IAMCTS/nbGames ,"%","gainIA_Deep : ", 100*gain_IAMCTS/nbGames,"%")
 
 
 
