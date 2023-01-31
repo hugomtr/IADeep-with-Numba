@@ -319,7 +319,7 @@ def PlayoutMCTSvsIADeep(B,nbSimus,c):
             possible_moves_ids = _PossibleMovesDeep(B[-1],B[0:64])
             pred = pred[0]
             pred = pred[possible_moves_ids] # select only possible moves idx for player 1 
-            id = np.argsort(pred)[-1]
+            id = np.argmax(pred)
             assert(len(pred) == B[-1])
             idMove = B[id]
             Play(B,idMove)
