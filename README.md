@@ -9,14 +9,14 @@
 First of all for running the project you will need a recent python version (>3.8.x).
 
 <br>
-For a clean installation we recommand you to install the project in a python virtual environnement. For this you can executes the following bash commands.
+For a clean installation we recommend you to install the project in a python virtual environment. For this you can execute the following bash commands. 
 
 ```code
 source activate.sh
 activate
 ```
 ### Create a Dataset 
-A dataset is already at your disposal, training example are generated with Monte Carlo Tree Search Algorithm. If you want to regenate one with different c value (hyperparameter of the algorithm) you can change the C_VALUE global variable in dataset.py,
+A dataset is already at your disposal, training examples are generated with Monte Carlo Tree Search Algorithm. If you want to regenerate one with different c value (hyperparameter of the algorithm) you can change the C_VALUE global variable in dataset.py,
 and run:
 
 ```code
@@ -24,7 +24,7 @@ python3 dataset.py
 ```
 
 ### Running a training 
-You can find weights in the weights folder: These are weights from a model trained with specific parameters but if you want to train with your own parameters you can lauch a training like this:
+You can find weights in the weights folder: These are weights from a model trained with specific parameters but if you want to train with your own parameters you can launch a training like this:
 <br>
 
 ```code
@@ -58,7 +58,7 @@ python3 simulation.py
 ```
 ### Issues & Troubleshooting
 
-For running the project correctly it is important that you are able to install the required library with each specific versions.
+For running the project correctly it is important that you are able to install all the required library with each specific versions.
 
 
 
